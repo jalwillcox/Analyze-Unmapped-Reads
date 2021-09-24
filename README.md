@@ -58,7 +58,7 @@ Example Usage
 
 To use defaults, but keep unmapped read fastq output:
 
-    `./analyze-unmapped-reads.sh -b sample1.cram -o sample1 -k`
+    ./analyze-unmapped-reads.sh -b sample1.cram -o sample1 -k
 
 To only return fastq files for unaligned reads:
 
