@@ -62,11 +62,11 @@ To use defaults, but keep unmapped read fastq output:
 
 To only return fastq files for unaligned reads:
 
-    `./analyze-unmapped-reads.sh -b sample1.cram -o sample1 -f`
+    ./analyze-unmapped-reads.sh -b sample1.cram -o sample1 -f
 
 To use RNA-Seq data and limit scaffold lengths to 1kb or longer:
 
-    `./analyze-unmapped-reads.sh -b sample1.cram -o sample1 -r -m 1000`
+    ./analyze-unmapped-reads.sh -b sample1.cram -o sample1 -r -m 1000
 
 
 Output
