@@ -49,7 +49,7 @@ Flags
 | -n   | integer (optional)        | 10                          | max percentage of Ns in order to keep a scaffold             |
 | -r   | no argument (optional)    | -                           | use RNA-Seq data                                             |
 | -s   | no argument (optional)    | -                           | skip blast step                                              |
-| -t   | temp directory (optional) | ./                          | a temporary directory to store intermediate files            |
+| -t   | temp directory (optional) | .                           | a temporary directory to store intermediate files            |
 | -h   | no argument (optional)    | -                           | print usage                                                  |
 
 
