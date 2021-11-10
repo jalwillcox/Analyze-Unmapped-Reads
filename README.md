@@ -35,22 +35,23 @@ This script uses the following programs; alternate versions may also work:
 Flags
 -----
 
-| Flag | Argument                  | Default                     | Description                                                  |
-|------|---------------------------|-----------------------------|--------------------------------------------------------------|
-| -b   | filename (required)       | -                           | BAM/CRAM input file                                          |
-| -o   | string (required)         | -                           | the basename for the output file                             |
-| -a   | integer (optional)        | 5                           | the number of blast alignments                               |
-| -c   | integer (optional)        | 8                           | the number of threads to allow for parallel processing       |
-| -d   | integer (optional)        | 20                          | dustmasker level                                             |
-| -f   | no argument (optional)    | -                           | stop script after retreiving fastq files for unaligned reads |
-| -k   | no argument (optional)    | -                           | keep unmapped fastq files                                    |
-| -l   | blast db (optional)       | /n/shared_db/blastdb/202008 | full path to blast database                                  |
-| -m   | integer (optional)        | 500                         | minimum scaffold length to keep                              |
-| -n   | integer (optional)        | 10                          | max percentage of Ns in order to keep a scaffold             |
-| -r   | no argument (optional)    | -                           | use RNA-Seq data                                             |
-| -s   | no argument (optional)    | -                           | skip blast step                                              |
-| -t   | temp directory (optional) | .                           | a temporary directory to store intermediate files            |
-| -h   | no argument (optional)    | -                           | print usage                                                  |
+| Flag | Argument                            | Default                     | Description                                                    |
+|------|-------------------------------------|-----------------------------|----------------------------------------------------------------|
+| -b   | filename (required unless using -q) | -                           | BAM/CRAM input file                                            |
+| -o   | string (required)                   | -                           | the basename for the output file                               |
+| -a   | integer (optional)                  | 5                           | the number of blast alignments                                 |
+| -c   | integer (optional)                  | 8                           | the number of threads to allow for parallel processing         |
+| -d   | integer (optional)                  | 20                          | dustmasker level                                               |
+| -f   | no argument (optional)              | -                           | stop script after retreiving fastq files for unaligned reads   |
+| -k   | no argument (optional)              | -                           | keep unmapped fastq files                                      |
+| -l   | blast db (optional)                 | /n/shared_db/blastdb/202008 | full path to blast database                                    |
+| -m   | integer (optional)                  | 500                         | minimum scaffold length to keep                                |
+| -n   | integer (optional)                  | 10                          | max percentage of Ns in order to keep a scaffold               |
+| -q   | string (optional)                   | -                           | use zipped pair1 fastq file as input (fmt: pair1/2 or read1/2) |
+| -r   | no argument (optional)              | -                           | use RNA-Seq data                                               |
+| -s   | no argument (optional)              | -                           | skip blast step                                                |
+| -t   | temp directory (optional)           | .                           | a temporary directory to store intermediate files              |
+| -h   | no argument (optional)              | -                           | print usage                                                    |
 
 
 Example Usage

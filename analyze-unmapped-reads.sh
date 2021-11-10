@@ -1,15 +1,5 @@
 #!/bin/bash
 
-#SBATCH -J hg38-reject-scaffolds
-#SBATCH -o %x.%j.log
-#SBATCH -e %x.%j.err
-#SBATCH -p short
-#SBATCH -t 0-08:00:00
-#SBATCH -n 1
-#SBATCH -c 8
-#SBATCH --mem=24G
-##SBATCH --dependency=singleton
-
 echo $0 $@
 
 ### USAGE
@@ -21,9 +11,10 @@ print_usage() {
  ANALYZE UNMAPPED READS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
- This script takes unmapped reads from aligned WGS data,
-  generates scaffolds using the SPAdes program, and blasts 
-  the resulting scaffolds against a nucleotide database. 
+ This script takes unmapped reads from aligned WGS data, or 
+  paired fastq files generates scaffolds using the SPAdes 
+  program, and blasts the resulting scaffolds against a 
+  nucleotide database. 
  
  -------------------
  Required Programs
@@ -42,22 +33,23 @@ print_usage() {
  Flags
  -------------------
 
- -b (arg, required)	BAM or CRAM file
- -o (arg, required)	the basename for the output file
+ -b (arg, required unless using -q)	BAM or CRAM file
+ -o (arg, required)			the basename for the output file
 
- -a (arg)		number of blast alignments (default=5)
- -c (arg)		number of threads to allow (default=8)
- -d (arg)		dustmasker level (default=20)
- -f                     only return unaligned fastq files
- -k			keep unmapped fastq files
- -l (arg)               path to the blast database (default=/n/shared_db/blastdb/202008)
- -m (arg)		min scaffold length to keep (default=500)
- -n (arg)		max percentage of Ns in order to keep a scaffold (default=10)
- -r			use RNA-Seq data (WARNING: Make sure your bam/cram file includes unmapped reads!)
- -s                     skip blast step
- -t (arg)		a temporary directory to store intermediate files
+ -a (arg)				number of blast alignments (default=5)
+ -c (arg)				number of threads to allow (default=8)
+ -d (arg)				dustmasker level (default=20)
+ -f					only return unaligned fastq files
+ -k					keep unmapped fastq files
+ -l (arg)				path to the blast database (default=/n/shared_db/blastdb/202008)
+ -m (arg)				min scaffold length to keep (default=500)
+ -n (arg)				max percentage of Ns in order to keep a scaffold (default=10)
+ -q (arg)				use pair1 fastq file as input
+ -r					use RNA-Seq data (WARNING: Make sure your bam/cram file includes unmapped reads!)
+ -s					skip blast step
+ -t (arg)				a temporary directory to store intermediate files
 
- -h                     print usage
+ -h					print usage
 
  -------------------
  Example Usage
@@ -83,6 +75,7 @@ print_usage() {
 
 cram=''
 name=''
+fq=''
 
 nalign=5
 threads=8
@@ -101,7 +94,7 @@ dustmasker=dustmasker
 prinseq=prinseq-lite.pl
 
 
-while getopts 'b:o:a:c:d:fkl:m:n:t:rsh' flag; do
+while getopts 'b:o:a:c:d:fkl:m:n:t:q:rsh' flag; do
   case "${flag}" in
     b) cram="${OPTARG}" ;;
     o) name="${OPTARG}" ;;
@@ -114,6 +107,7 @@ while getopts 'b:o:a:c:d:fkl:m:n:t:rsh' flag; do
     m) scamin="${OPTARG}" ;;
     n) maxn="${OPTARG}" ;;
     t) tmp="${OPTARG}" ;;
+    q) fq="${OPTARG}" ;;
     r) rna="true" ;;
     s) skip="true" ;;
     h) print_usage ; exit ;;
@@ -122,9 +116,17 @@ while getopts 'b:o:a:c:d:fkl:m:n:t:rsh' flag; do
   esac
 done
 
-if [ -z "$cram" ]; then
+if [ -z "$cram" ] && [ -z "$fq" ]; then
   print_usage
-  echo "ERROR: -b argument missing, please enter a BAM or CRAM file"
+  echo "ERROR: -b and -q arguments missing, please enter a BAM/CRAM or fastq file"
+  exit 1
+elif [ -n "$cram" ] && [ -n "$fq" ]; then
+  print_usage
+  echo "ERROR: -b and -q flags are incompatible, please use one or the other"
+  exit 1
+elif [ -n "$fqonly" ] && [ -n "$fq" ]; then
+  print_usage
+  echo "ERROR: -f and -q flags are incompatible, please use one or the other"
   exit 1
 elif [ -z "$name" ]; then
   print_usage
@@ -154,70 +156,86 @@ mkdir $outdir
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-echo "Generating fastq files for unmapped reads"
+## Skip if using the -q flag
+if [ -z "$fq" ]; then
 
-unmapped=${tmp}/${name}_unmapped.bam
-echo "Grabbing unmapped reads..."
-echo "This could take on the order of 1hr"
-date
-samtools view -@${threads} -f4 -F2048 -T $HG38 -bh $cram > $unmapped
+  echo "Generating fastq files for unmapped reads"
 
-## Get mates of unmapped reads (excluding unmapped reads themselves)
+  unmapped=${tmp}/${name}_unmapped.bam
+  echo "Grabbing unmapped reads..."
+  echo "This could take on the order of 1hr"
+  date
+  samtools view -@${threads} -f4 -F2048 -T $HG38 -bh $cram > $unmapped
 
-mates_tmp=${tmp}/${name}_tmp_unmapped-mates.bam
-mates=${tmp}/${name}_unmapped-mates.bam
+  ## Get mates of unmapped reads (excluding unmapped reads themselves)
 
-echo "Grabbing mapped mates..."
-echo "This could take on the order of 1hr"
-date
-samtools view -@${threads} -f8 -F2048 -T $HG38 -bh $cram > $mates_tmp
+  mates_tmp=${tmp}/${name}_tmp_unmapped-mates.bam
+  mates=${tmp}/${name}_unmapped-mates.bam
 
-echo "Removing double counts (read & mate are both unmapped)..."
-date
-samtools view -@${threads} -F4 -T $HG38 -bh $mates_tmp > $mates
+  echo "Grabbing mapped mates..."
+  echo "This could take on the order of 1hr"
+  date
+  samtools view -@${threads} -f8 -F2048 -T $HG38 -bh $cram > $mates_tmp
 
-rm $mates_tmp
+  echo "Removing double counts (read & mate are both unmapped)..."
+  date
+  samtools view -@${threads} -F4 -T $HG38 -bh $mates_tmp > $mates
 
-## Merge unmapped and mates of unmapped reads
+  rm $mates_tmp
 
-merged=${tmp}/${name}_unmapped_mates.bam
+  ## Merge unmapped and mates of unmapped reads
 
-echo "Merging unmapped + mates..."
-date
-samtools merge -@${threads} $merged $unmapped $mates
+  merged=${tmp}/${name}_unmapped_mates.bam
 
-rm $unmapped $mates
+  echo "Merging unmapped + mates..."
+  date
+  samtools merge -@${threads} $merged $unmapped $mates
 
-## Sort merged file
+  rm $unmapped $mates
 
-sorted=${tmp}/${name}_unmapped_mates.sorted.bam
+  ## Sort merged file
 
-echo "Sorting..."
-date
-samtools sort -@16 -n $merged > $sorted
+  sorted=${tmp}/${name}_unmapped_mates.sorted.bam
 
-rm $merged
+  echo "Sorting..."
+  date
+  samtools sort -@16 -n $merged > $sorted
 
-## Convert bam to fastq
+  rm $merged
 
-r1=${outdir}/${name}-bam2fq-pair1.fastq
-r2=${outdir}/${name}-bam2fq-pair2.fastq
+  ## Convert bam to fastq
 
-echo "Converting to fastq..."
-date
-bamToFastq -i $sorted -fq $r1 -fq2 $r2
+  r1=${outdir}/${name}-bam2fq-pair1.fastq
+  r2=${outdir}/${name}-bam2fq-pair2.fastq
 
-bgzip $r1
-bgzip $r2
+  echo "Converting to fastq..."
+  date
+  bamToFastq -i $sorted -fq $r1 -fq2 $r2
 
-r1=${r1}.gz
-r2=${r2}.gz
+  bgzip $r1
+  bgzip $r2
 
-if [ -n "$fqonly" ]; then
-  rm -r $tmp
-  echo "Unmapped reads can be found in $r1, $r2"
-  exit 0
+  r1=${r1}.gz
+  r2=${r2}.gz
+
+  if [ -n "$fqonly" ]; then
+    rm -r $tmp
+    echo "Unmapped reads can be found in $r1, $r2"
+    exit 0
+  fi
+
+else
+
+  r1=$fq
+  r2=$(echo $r1 | sed 's/pair1/pair2/g' | sed 's/read1/read2/g')
+
+  if [ -z "$(echo $r1 | grep 'pair1\|read1' | grep 'gz'$)" ]; then
+    echo "ERROR: Please use zipped, paired fq files with the format \"pair1/2\" or \"read1/2\""
+    exit 1
+  fi
+
 fi
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #  Part 2: Generate Scaffolds (spades)
@@ -241,14 +259,14 @@ rm -r $outdir_tmp
 #  Removes short sequences and repeat sequences
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-dm=${tmp}/${name}_dm${dm}.fa
+dm=${tmp}/${name}_dm${dm_level}.fa
 
 echo "Masking repeats in scaffolds..."
 date
 $dustmasker -in $scafa -level $dm_level -outfmt fasta | sed 's/[cagtn]/N/g' | sed 's/leNNNh/length/g' | sed 's/Nov/cov/g' > $dm
 rm $scafa
 
-ps=${outdir}/${name}_spades_dm${dm}_ps
+ps=${outdir}/${name}_spades_dm${dm_level}_ps
 
 echo "Filtering out short scaffolds and repeat sequences..."
 date
@@ -268,7 +286,7 @@ if [ -z "$rna" ] && [ -z "$skip" ] ; then
   echo "Blasting scaffold sequences..."
   date
   blastn -num_threads ${threads} -outfmt "6 qseqid saccver evalue length sstart send ssciname scomname stitle sblastname sskingdom" -query $fa -out ${blast_out} -db nt -num_alignments $nalign
-elif [ -z "$skip" ]
+elif [ -z "$skip" ]; then
   blast_out=${outdir}/${name}_blastx.txt
   
   echo "Blasting scaffold sequences..."
@@ -277,7 +295,7 @@ elif [ -z "$skip" ]
 fi  
 
 rm -r $tmp
-if [ -z "$keep" ] ; then
+if [ -z "$keep" ] && [ -z "$fq" ]; then
   rm $r1 $r2
 fi
 
